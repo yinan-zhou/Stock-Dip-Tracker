@@ -225,7 +225,8 @@
     margin-bottom: 6px;
   }
 
-  .input-group input {
+  .input-group input,
+  .input-group select {
     width: 100%;
     background: var(--surface2);
     border: 0.5px solid var(--border2);
@@ -239,6 +240,26 @@
   }
 
   .input-group input:focus { border-color: var(--accent); }
+  .input-group select:focus { border-color: var(--accent); }
+
+  .alert-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr auto;
+    gap: 10px;
+    margin: -0.8rem 0 1.5rem;
+    background: rgba(46,204,135,0.04);
+    border: 0.5px solid rgba(46,204,135,0.22);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+  }
+
+  .alert-status {
+    align-self: end;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    line-height: 1.35;
+  }
 
   .update-btn {
     align-self: flex-end;
@@ -466,6 +487,7 @@
     .dip-row > *:nth-child(5),
     .dip-header > *:nth-child(5) { display: none; }
     .input-row { grid-template-columns: 1fr 1fr; }
+    .alert-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -507,6 +529,24 @@
     <div>
       <button class="update-btn" onclick="updateData()">↻ Update</button>
     </div>
+  </div>
+
+  <div class="alert-row">
+    <div class="input-group">
+      <label>Email alert to</label>
+      <input type="email" id="alertEmail" placeholder="you@example.com">
+    </div>
+    <div class="input-group">
+      <label>Trigger when dip reaches</label>
+      <select id="alertThreshold">
+        <option value="5">5% dip</option>
+        <option value="8">8% dip</option>
+        <option value="10">10% dip</option>
+        <option value="15">15% dip</option>
+        <option value="20">20% dip</option>
+      </select>
+    </div>
+    <div class="alert-status" id="alertStatus">Email alert off</div>
   </div>
 
   <!-- Current dip callout -->
@@ -553,8 +593,8 @@
 <script>
 const TICKERS = {
   QQQ: {
-    ath: 722.03,
-    current: 701.66,
+    ath: 748.65,
+    current: 726.04,
     crashLow: 505.58,
     crashDepth: 23,
     recoveryPct: 42.8,
@@ -563,8 +603,8 @@ const TICKERS = {
     expectedRemaining: { 5: 2.5, 8: 1, 10: 0.5, 15: 0.2, 20: 0.05 }
   },
   SPY: {
-    ath: 749.53,
-    current: 735.38,
+    ath: 760.40,
+    current: 749.82,
     crashLow: 575.60,
     crashDepth: 19,
     recoveryPct: 30.2,
@@ -585,6 +625,14 @@ let priceIsLive = false;
 // Finnhub — direct CORS-supported API, free tier, real-time US quotes
 const FINNHUB_KEY = 'd86bqfhr01qgiu44nqvgd86bqfhr01qgiu44nr00';
 
+// Add your EmailJS values here for automatic sends from a static site.
+// Until these are filled in, the alert opens a prefilled email draft instead.
+const EMAILJS_SERVICE_ID = '';
+const EMAILJS_TEMPLATE_ID = '';
+const EMAILJS_PUBLIC_KEY = '';
+const ALERT_STORAGE_KEY = 'stockDipEmailAlert';
+const ALERT_SENT_KEY = 'stockDipEmailAlertSent';
+
 async function fetchPriceWithFallback(symbol) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -596,30 +644,56 @@ async function fetchPriceWithFallback(symbol) {
   return price;
 }
 
+async function fetchAthWithFallback(symbol) {
+  const inceptionYears = { QQQ: 1999, SPY: 1993 };
+  const from = Math.floor(new Date(`${inceptionYears[symbol] || 1990}-01-01T00:00:00Z`).getTime() / 1000);
+  const to = Math.floor(Date.now() / 1000);
+  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!resp.ok) throw new Error('finnhub candles http ' + resp.status);
+  const data = await resp.json();
+  if (data.s !== 'ok' || !Array.isArray(data.h) || !data.h.length) {
+    throw new Error('finnhub bad candles');
+  }
+  const ath = Math.max(...data.h.filter(n => Number.isFinite(n) && n > 0));
+  if (!ath || ath <= 0) throw new Error('finnhub bad ath');
+  return ath;
+}
+
+async function fetchTickerLiveData(symbol) {
+  const [price, ath] = await Promise.all([
+    fetchPriceWithFallback(symbol),
+    fetchAthWithFallback(symbol)
+  ]);
+  return { price, ath: Math.max(price, ath, TICKERS[symbol].ath) };
+}
+
 async function fetchAllPrices() {
   const badge = document.getElementById('liveBadge');
   badge.className = 'fetching-badge';
   badge.textContent = '⟳ fetching...';
   try {
-    const [qqqPrice, spyPrice] = await Promise.all([
-      fetchPriceWithFallback('QQQ'),
-      fetchPriceWithFallback('SPY')
+    const [qqq, spy] = await Promise.all([
+      fetchTickerLiveData('QQQ'),
+      fetchTickerLiveData('SPY')
     ]);
-    if (qqqPrice > 0) {
-      TICKERS.QQQ.current = qqqPrice;
-      if (qqqPrice > TICKERS.QQQ.ath) TICKERS.QQQ.ath = qqqPrice;
+    if (qqq.price > 0) {
+      TICKERS.QQQ.current = qqq.price;
+      TICKERS.QQQ.ath = qqq.ath;
     }
-    if (spyPrice > 0) {
-      TICKERS.SPY.current = spyPrice;
-      if (spyPrice > TICKERS.SPY.ath) TICKERS.SPY.ath = spyPrice;
+    if (spy.price > 0) {
+      TICKERS.SPY.current = spy.price;
+      TICKERS.SPY.ath = spy.ath;
     }
     lastFetchTime = new Date();
     priceIsLive = true;
     badge.className = 'live-badge';
-    badge.innerHTML = '<span class="live-dot"></span>live';
+    badge.innerHTML = '<span class="live-dot"></span>live price + ATH';
     document.getElementById('inputPrice').value = TICKERS[activeTicker].current.toFixed(2);
     document.getElementById('inputATH').value = TICKERS[activeTicker].ath.toFixed(2);
     render();
+    checkDipEmailAlert('QQQ');
+    checkDipEmailAlert('SPY');
   } catch(e) {
     priceIsLive = false;
     badge.className = 'stale-badge';
@@ -646,10 +720,122 @@ function updateData() {
   document.getElementById('liveBadge').className = 'stale-badge';
   document.getElementById('liveBadge').textContent = '✎ manual';
   render();
+  checkDipEmailAlert(activeTicker);
 }
 
 function fmt(n) { return '$' + n.toFixed(2); }
 function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+function loadAlertSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(ALERT_STORAGE_KEY)) || { email: '', threshold: 5 };
+  } catch(e) {
+    return { email: '', threshold: 5 };
+  }
+}
+
+function saveAlertSettings() {
+  const settings = {
+    email: document.getElementById('alertEmail').value.trim(),
+    threshold: parseFloat(document.getElementById('alertThreshold').value)
+  };
+  localStorage.setItem(ALERT_STORAGE_KEY, JSON.stringify(settings));
+  updateAlertStatus();
+}
+
+function getSentAlerts() {
+  try {
+    return JSON.parse(localStorage.getItem(ALERT_SENT_KEY)) || {};
+  } catch(e) {
+    return {};
+  }
+}
+
+function markAlertSent(symbol, level) {
+  const sent = getSentAlerts();
+  sent[`${symbol}-${level}`] = new Date().toISOString();
+  localStorage.setItem(ALERT_SENT_KEY, JSON.stringify(sent));
+}
+
+function updateAlertStatus(message) {
+  const settings = loadAlertSettings();
+  const status = document.getElementById('alertStatus');
+  if (message) {
+    status.textContent = message;
+  } else if (settings.email) {
+    status.textContent = `Watching ${settings.threshold}%+ dips`;
+  } else {
+    status.textContent = 'Email alert off';
+  }
+}
+
+async function sendDipAlertEmail({ symbol, level, dip, price, ath, email }) {
+  const subject = `${symbol} reached a ${level}% dip`;
+  const body = [
+    `${symbol} has reached the ${level}% dip trigger.`,
+    '',
+    `Current price: ${fmt(price)}`,
+    `Live ATH: ${fmt(ath)}`,
+    `Dip from ATH: ${dip.toFixed(1)}%`,
+    `Time: ${new Date().toLocaleString('en-US')}`
+  ].join('\n');
+
+  if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
+    const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: {
+          to_email: email,
+          subject,
+          ticker: symbol,
+          dip_level: level,
+          dip_percent: dip.toFixed(1),
+          current_price: fmt(price),
+          ath_price: fmt(ath),
+          message: body
+        }
+      })
+    });
+    if (!resp.ok) throw new Error('emailjs http ' + resp.status);
+    return 'Email sent';
+  }
+
+  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return 'Email draft opened';
+}
+
+async function checkDipEmailAlert(symbol) {
+  const settings = loadAlertSettings();
+  if (!settings.email) return;
+
+  const d = TICKERS[symbol];
+  const dip = Math.abs(((d.current - d.ath) / d.ath) * 100);
+  const levels = [5, 8, 10, 15, 20].filter(level => level >= settings.threshold && dip >= level);
+  const reachedLevel = levels.length ? Math.max(...levels) : null;
+  if (!reachedLevel) return;
+
+  const alertKey = `${symbol}-${reachedLevel}`;
+  if (getSentAlerts()[alertKey]) return;
+
+  try {
+    const result = await sendDipAlertEmail({
+      symbol,
+      level: reachedLevel,
+      dip,
+      price: d.current,
+      ath: d.ath,
+      email: settings.email
+    });
+    markAlertSent(symbol, reachedLevel);
+    updateAlertStatus(`${result}: ${symbol} ${reachedLevel}%`);
+  } catch(e) {
+    updateAlertStatus(`Email failed: ${symbol} ${reachedLevel}%`);
+  }
+}
 
 function render() {
   const d = TICKERS[activeTicker];
@@ -770,8 +956,14 @@ function render() {
 }
 
 // Init — render with fallback values first, then fetch live
+const alertSettings = loadAlertSettings();
 document.getElementById('inputPrice').value = TICKERS[activeTicker].current;
 document.getElementById('inputATH').value = TICKERS[activeTicker].ath;
+document.getElementById('alertEmail').value = alertSettings.email || '';
+document.getElementById('alertThreshold').value = String(alertSettings.threshold || 5);
+document.getElementById('alertEmail').addEventListener('change', saveAlertSettings);
+document.getElementById('alertThreshold').addEventListener('change', saveAlertSettings);
+updateAlertStatus();
 render();
 fetchAllPrices();
 </script>
