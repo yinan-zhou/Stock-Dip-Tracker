@@ -520,11 +520,11 @@
   <div class="input-row">
     <div class="input-group">
       <label>Current Price ($)</label>
-      <input type="number" id="inputPrice" step="0.01" placeholder="e.g. 701.66">
+      <input type="number" id="inputPrice" step="0.01" placeholder="e.g. 726.04">
     </div>
     <div class="input-group">
       <label>ATH ($) — override</label>
-      <input type="number" id="inputATH" step="0.01" placeholder="e.g. 722.03">
+      <input type="number" id="inputATH" step="0.01" placeholder="e.g. 748.65">
     </div>
     <div>
       <button class="update-btn" onclick="updateData()">↻ Update</button>
@@ -634,6 +634,14 @@ const ALERT_STORAGE_KEY = 'stockDipEmailAlert';
 const ALERT_SENT_KEY = 'stockDipEmailAlertSent';
 
 async function fetchPriceWithFallback(symbol) {
+  try {
+    return await fetchFinnhubPrice(symbol);
+  } catch(e) {
+    return fetchYahooPrice(symbol);
+  }
+}
+
+async function fetchFinnhubPrice(symbol) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!resp.ok) throw new Error('finnhub http ' + resp.status);
@@ -641,6 +649,17 @@ async function fetchPriceWithFallback(symbol) {
   // c = current price, pc = previous close
   const price = data.c > 0 ? data.c : data.pc;
   if (!price || price <= 0) throw new Error('finnhub bad price');
+  return price;
+}
+
+async function fetchYahooPrice(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error('yahoo http ' + resp.status);
+  const data = await resp.json();
+  const meta = data?.chart?.result?.[0]?.meta;
+  const price = meta?.regularMarketPrice || meta?.previousClose;
+  if (!price || price <= 0) throw new Error('yahoo bad price');
   return price;
 }
 
@@ -661,40 +680,51 @@ async function fetchAthWithFallback(symbol) {
 }
 
 async function fetchTickerLiveData(symbol) {
-  const [price, ath] = await Promise.all([
-    fetchPriceWithFallback(symbol),
-    fetchAthWithFallback(symbol)
-  ]);
-  return { price, ath: Math.max(price, ath, TICKERS[symbol].ath) };
+  const price = await fetchPriceWithFallback(symbol);
+  let ath = TICKERS[symbol].ath;
+  let athIsLive = false;
+
+  try {
+    ath = Math.max(price, await fetchAthWithFallback(symbol), TICKERS[symbol].ath);
+    athIsLive = true;
+  } catch(e) {
+    ath = Math.max(price, TICKERS[symbol].ath);
+  }
+
+  return { price, ath, athIsLive };
 }
 
 async function fetchAllPrices() {
   const badge = document.getElementById('liveBadge');
   badge.className = 'fetching-badge';
   badge.textContent = '⟳ fetching...';
-  try {
-    const [qqq, spy] = await Promise.all([
-      fetchTickerLiveData('QQQ'),
-      fetchTickerLiveData('SPY')
-    ]);
-    if (qqq.price > 0) {
-      TICKERS.QQQ.current = qqq.price;
-      TICKERS.QQQ.ath = qqq.ath;
-    }
-    if (spy.price > 0) {
-      TICKERS.SPY.current = spy.price;
-      TICKERS.SPY.ath = spy.ath;
-    }
+  const results = await Promise.allSettled([
+    fetchTickerLiveData('QQQ'),
+    fetchTickerLiveData('SPY')
+  ]);
+  const qqq = results[0].status === 'fulfilled' ? results[0].value : null;
+  const spy = results[1].status === 'fulfilled' ? results[1].value : null;
+
+  if (qqq?.price > 0) {
+    TICKERS.QQQ.current = qqq.price;
+    TICKERS.QQQ.ath = qqq.ath;
+  }
+  if (spy?.price > 0) {
+    TICKERS.SPY.current = spy.price;
+    TICKERS.SPY.ath = spy.ath;
+  }
+
+  if (qqq || spy) {
     lastFetchTime = new Date();
     priceIsLive = true;
     badge.className = 'live-badge';
-    badge.innerHTML = '<span class="live-dot"></span>live price + ATH';
+    badge.innerHTML = `<span class="live-dot"></span>${qqq?.athIsLive || spy?.athIsLive ? 'live price + ATH' : 'live price'}`;
     document.getElementById('inputPrice').value = TICKERS[activeTicker].current.toFixed(2);
     document.getElementById('inputATH').value = TICKERS[activeTicker].ath.toFixed(2);
     render();
     checkDipEmailAlert('QQQ');
     checkDipEmailAlert('SPY');
-  } catch(e) {
+  } else {
     priceIsLive = false;
     badge.className = 'stale-badge';
     badge.textContent = '⚠ offline — enter price manually';
