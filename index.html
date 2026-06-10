@@ -633,65 +633,15 @@ const EMAILJS_PUBLIC_KEY = '';
 const ALERT_STORAGE_KEY = 'stockDipEmailAlert';
 const ALERT_SENT_KEY = 'stockDipEmailAlertSent';
 
-async function fetchPriceWithFallback(symbol) {
-  try {
-    return await fetchFinnhubPrice(symbol);
-  } catch(e) {
-    return fetchYahooPrice(symbol);
-  }
-}
-
-async function fetchFinnhubPrice(symbol) {
+async function fetchTickerLiveData(symbol) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error('finnhub http ' + resp.status);
   const data = await resp.json();
-  // c = current price, pc = previous close
   const price = data.c > 0 ? data.c : data.pc;
   if (!price || price <= 0) throw new Error('finnhub bad price');
-  return price;
-}
-
-async function fetchYahooPrice(symbol) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1m`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!resp.ok) throw new Error('yahoo http ' + resp.status);
-  const data = await resp.json();
-  const meta = data?.chart?.result?.[0]?.meta;
-  const price = meta?.regularMarketPrice || meta?.previousClose;
-  if (!price || price <= 0) throw new Error('yahoo bad price');
-  return price;
-}
-
-async function fetchAthWithFallback(symbol) {
-  const inceptionYears = { QQQ: 1999, SPY: 1993 };
-  const from = Math.floor(new Date(`${inceptionYears[symbol] || 1990}-01-01T00:00:00Z`).getTime() / 1000);
-  const to = Math.floor(Date.now() / 1000);
-  const url = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_KEY}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
-  if (!resp.ok) throw new Error('finnhub candles http ' + resp.status);
-  const data = await resp.json();
-  if (data.s !== 'ok' || !Array.isArray(data.h) || !data.h.length) {
-    throw new Error('finnhub bad candles');
-  }
-  const ath = Math.max(...data.h.filter(n => Number.isFinite(n) && n > 0));
-  if (!ath || ath <= 0) throw new Error('finnhub bad ath');
-  return ath;
-}
-
-async function fetchTickerLiveData(symbol) {
-  const price = await fetchPriceWithFallback(symbol);
-  let ath = TICKERS[symbol].ath;
-  let athIsLive = false;
-
-  try {
-    ath = Math.max(price, await fetchAthWithFallback(symbol), TICKERS[symbol].ath);
-    athIsLive = true;
-  } catch(e) {
-    ath = Math.max(price, TICKERS[symbol].ath);
-  }
-
-  return { price, ath, athIsLive };
+  const ath = Math.max(price, TICKERS[symbol].ath);
+  return { price, ath, athIsLive: false };
 }
 
 async function fetchAllPrices() {
@@ -845,27 +795,29 @@ async function checkDipEmailAlert(symbol) {
   const d = TICKERS[symbol];
   const dip = Math.abs(((d.current - d.ath) / d.ath) * 100);
   const levels = [5, 8, 10, 15, 20].filter(level => level >= settings.threshold && dip >= level);
-  const reachedLevel = levels.length ? Math.max(...levels) : null;
-  if (!reachedLevel) return;
+  if (!levels.length) return;
 
-  const alertKey = `${symbol}-${reachedLevel}`;
-  if (getSentAlerts()[alertKey]) return;
-
-  try {
-    const result = await sendDipAlertEmail({
-      symbol,
-      level: reachedLevel,
-      dip,
-      price: d.current,
-      ath: d.ath,
-      email: settings.email
-    });
-    markAlertSent(symbol, reachedLevel);
-    updateAlertStatus(`${result}: ${symbol} ${reachedLevel}%`);
-  } catch(e) {
-    updateAlertStatus(`Email failed: ${symbol} ${reachedLevel}%`);
+  const sentAlerts = getSentAlerts();
+  for (const reachedLevel of levels) {
+    const alertKey = `${symbol}-${reachedLevel}`;
+    if (sentAlerts[alertKey]) continue;
+    try {
+      const result = await sendDipAlertEmail({
+        symbol,
+        level: reachedLevel,
+        dip,
+        price: d.current,
+        ath: d.ath,
+        email: settings.email
+      });
+      markAlertSent(symbol, reachedLevel);
+      updateAlertStatus(`${result}: ${symbol} −${reachedLevel}%`);
+    } catch(e) {
+      updateAlertStatus(`Email failed: ${symbol} −${reachedLevel}%`);
+    }
   }
 }
+
 
 function render() {
   const d = TICKERS[activeTicker];
@@ -987,9 +939,10 @@ function render() {
 
 // Init — render with fallback values first, then fetch live
 const alertSettings = loadAlertSettings();
+if (!alertSettings.email) alertSettings.email = 'lena.zhouyinan@gmail.com';
 document.getElementById('inputPrice').value = TICKERS[activeTicker].current;
 document.getElementById('inputATH').value = TICKERS[activeTicker].ath;
-document.getElementById('alertEmail').value = alertSettings.email || '';
+document.getElementById('alertEmail').value = alertSettings.email;
 document.getElementById('alertThreshold').value = String(alertSettings.threshold || 5);
 document.getElementById('alertEmail').addEventListener('change', saveAlertSettings);
 document.getElementById('alertThreshold').addEventListener('change', saveAlertSettings);
