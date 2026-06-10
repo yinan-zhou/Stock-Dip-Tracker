@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ETF Dip Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
 
@@ -478,6 +479,154 @@
   .callout-text { font-size: 13px; color: var(--accent2); font-family: 'DM Mono', monospace; }
   .callout-text strong { color: var(--text); }
 
+  /* Market indicators */
+  .indicators-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .indicator-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    position: relative;
+  }
+
+  .indicator-card.signal-buy { border-color: rgba(46,204,135,0.4); background: rgba(46,204,135,0.05); }
+  .indicator-card.signal-caution { border-color: rgba(245,166,35,0.4); background: rgba(245,166,35,0.05); }
+  .indicator-card.signal-danger { border-color: rgba(245,66,66,0.3); background: rgba(245,66,66,0.04); }
+
+  .indicator-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 6px;
+  }
+
+  .indicator-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .indicator-signal {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    margin-top: 4px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  .indicator-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+  }
+
+  .indicator-bar-wrap {
+    margin-top: 8px;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .indicator-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* Sell signals */
+  .sell-callout {
+    background: linear-gradient(135deg, rgba(245,66,66,0.08), rgba(245,166,35,0.06));
+    border: 0.5px solid rgba(245,66,66,0.25);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .sell-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red);
+    flex-shrink: 0;
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  .sell-callout-text { font-size: 13px; color: #f5a0a0; font-family: 'DM Mono', monospace; }
+  .sell-callout-text strong { color: var(--text); }
+
+  /* Sell indicator cards */
+  .sell-indicators-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Profit targets table */
+  .profit-section {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .profit-header {
+    display: grid;
+    grid-template-columns: 80px 110px 110px 110px 110px;
+    gap: 10px;
+    padding: 0 0.25rem;
+    margin-bottom: 6px;
+  }
+
+  .profit-row {
+    display: grid;
+    grid-template-columns: 80px 110px 110px 110px 110px;
+    gap: 10px;
+    padding: 0.6rem 0.25rem;
+    border-top: 0.5px solid var(--border);
+    align-items: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  .profit-row.in-profit { color: var(--green); }
+  .profit-row.in-loss { color: var(--red); }
+
+  .profit-gain {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    padding: 2px 7px;
+    border-radius: 5px;
+    display: inline-block;
+  }
+
+  .gain-green { background: var(--green-bg); color: var(--green); }
+  .gain-amber { background: var(--amber-bg); color: var(--amber); }
+  .gain-red   { background: var(--red-bg);   color: var(--red); }
+  .gain-blue  { background: var(--blue-bg);  color: var(--blue); }
+
+  @media (max-width: 700px) {
+    .profit-header, .profit-row { grid-template-columns: 70px 90px 90px; }
+    .profit-header > *:nth-child(4), .profit-row > *:nth-child(4) { display: none; }
+    .profit-header > *:nth-child(5), .profit-row > *:nth-child(5) { display: none; }
+  }
+
   @media (max-width: 700px) {
     .dip-row, .dip-header {
       grid-template-columns: 60px 1fr 90px 90px;
@@ -515,6 +664,35 @@
 
   <!-- ATH Summary Cards -->
   <div class="ath-row" id="athRow"></div>
+
+  <!-- Market Indicators -->
+  <div class="section-label">Market conditions</div>
+  <div class="indicators-row" id="indicatorsRow">
+    <div class="indicator-card" id="indVix">
+      <div class="indicator-label">VIX — Fear Gauge</div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="indRsi">
+      <div class="indicator-label">RSI 14 — <span id="indRsiTicker">QQQ</span></div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="indFng">
+      <div class="indicator-label">Fear &amp; Greed Index</div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="indMa">
+      <div class="indicator-label">vs 200-day MA — <span id="indMaTicker">QQQ</span></div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+  </div>
 
   <!-- Inputs -->
   <div class="input-row">
@@ -565,6 +743,51 @@
   </div>
 
   <div class="dip-grid" id="dipGrid"></div>
+
+  <!-- Sell signals -->
+  <div class="section-label" style="margin-top:1.5rem">Sell / trim signals</div>
+
+  <div class="sell-callout" id="sellCallout"></div>
+
+  <div class="sell-indicators-row" id="sellIndicatorsRow">
+    <div class="indicator-card" id="sellIndRsi">
+      <div class="indicator-label">RSI — <span id="sellIndRsiTicker">QQQ</span></div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="sellIndFng">
+      <div class="indicator-label">Fear &amp; Greed</div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="sellIndVix">
+      <div class="indicator-label">VIX complacency</div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+    <div class="indicator-card" id="sellIndMa">
+      <div class="indicator-label">Extension above 200 MA — <span id="sellIndMaTicker">QQQ</span></div>
+      <div class="indicator-value" style="color:var(--muted)">—</div>
+      <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
+      <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+    </div>
+  </div>
+
+  <!-- Profit targets -->
+  <div class="section-label">Profit targets — if bought at each dip level</div>
+  <div class="profit-section">
+    <div class="profit-header">
+      <span class="col-label" style="text-align:left">Bought at</span>
+      <span class="col-label">Entry price</span>
+      <span class="col-label">+5% target</span>
+      <span class="col-label">+10% target</span>
+      <span class="col-label">Back to ATH</span>
+    </div>
+    <div id="profitGrid"></div>
+  </div>
 
   <!-- Progress -->
   <div class="progress-section">
@@ -617,6 +840,7 @@ const TICKERS = {
 let activeTicker = 'QQQ';
 let lastFetchTime = null;
 let priceIsLive = false;
+let indicators = { vix: null, rsi: {}, ma200: {}, fng: null };
 
 
 
@@ -624,14 +848,284 @@ let priceIsLive = false;
 
 // Finnhub — direct CORS-supported API, free tier, real-time US quotes
 const FINNHUB_KEY = 'd86bqfhr01qgiu44nqvgd86bqfhr01qgiu44nr00';
+emailjs.init('f5IYjpfQXGylPq6VK');
 
 // Add your EmailJS values here for automatic sends from a static site.
 // Until these are filled in, the alert opens a prefilled email draft instead.
-const EMAILJS_SERVICE_ID = '';
-const EMAILJS_TEMPLATE_ID = '';
-const EMAILJS_PUBLIC_KEY = '';
+const EMAILJS_SERVICE_ID = 'service_v6neq4l';
+const EMAILJS_TEMPLATE_ID = 'template_o0wm3kb';
+const EMAILJS_PUBLIC_KEY = 'f5IYjpfQXGylPq6VK';
 const ALERT_STORAGE_KEY = 'stockDipEmailAlert';
 const ALERT_SENT_KEY = 'stockDipEmailAlertSent';
+
+// ── Market Indicators ────────────────────────────────────────────────────────
+
+async function fetchVIX() {
+  const url = `https://finnhub.io/api/v1/quote?symbol=VIX&token=${FINNHUB_KEY}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error('vix http ' + resp.status);
+  const data = await resp.json();
+  const v = data.c > 0 ? data.c : data.pc;
+  if (!v || v <= 0) throw new Error('vix bad data');
+  return v;
+}
+
+async function fetchRSI(symbol) {
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - 60 * 24 * 60 * 60; // 60 days back
+  const url = `https://finnhub.io/api/v1/indicator?symbol=${symbol}&resolution=D&from=${from}&to=${to}&indicator=rsi&timeperiod=14&token=${FINNHUB_KEY}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error('rsi http ' + resp.status);
+  const data = await resp.json();
+  if (!data.rsi?.length) throw new Error('rsi bad data');
+  return data.rsi[data.rsi.length - 1];
+}
+
+async function fetchMA200(symbol) {
+  const to = Math.floor(Date.now() / 1000);
+  const from = to - 300 * 24 * 60 * 60; // 300 days back
+  const url = `https://finnhub.io/api/v1/indicator?symbol=${symbol}&resolution=D&from=${from}&to=${to}&indicator=sma&timeperiod=200&token=${FINNHUB_KEY}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!resp.ok) throw new Error('ma200 http ' + resp.status);
+  const data = await resp.json();
+  if (!data.sma?.length) throw new Error('ma200 bad data');
+  return data.sma[data.sma.length - 1];
+}
+
+async function fetchFearGreed() {
+  const resp = await fetch('https://api.alternative.me/fng/?limit=1', { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error('fng http ' + resp.status);
+  const data = await resp.json();
+  return { value: parseInt(data.data[0].value), label: data.data[0].value_classification };
+}
+
+async function fetchAllIndicators() {
+  const [vixRes, rsiQRes, rsiSRes, ma200QRes, ma200SRes, fngRes] = await Promise.allSettled([
+    fetchVIX(),
+    fetchRSI('QQQ'),
+    fetchRSI('SPY'),
+    fetchMA200('QQQ'),
+    fetchMA200('SPY'),
+    fetchFearGreed()
+  ]);
+  if (vixRes.status === 'fulfilled') indicators.vix = vixRes.value;
+  if (rsiQRes.status === 'fulfilled') indicators.rsi.QQQ = rsiQRes.value;
+  if (rsiSRes.status === 'fulfilled') indicators.rsi.SPY = rsiSRes.value;
+  if (ma200QRes.status === 'fulfilled') indicators.ma200.QQQ = ma200QRes.value;
+  if (ma200SRes.status === 'fulfilled') indicators.ma200.SPY = ma200SRes.value;
+  if (fngRes.status === 'fulfilled') indicators.fng = fngRes.value;
+  renderIndicators();
+  renderSellSignals();
+}
+
+function renderIndicators() {
+  renderVIX();
+  renderRSI();
+  renderFNG();
+  renderMA200();
+}
+
+function setIndicatorCard(id, { value, sub, signal, color, barPct, barColor }) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  card.className = 'indicator-card' + (signal ? ` signal-${signal}` : '');
+  card.querySelector('.indicator-value').textContent = value;
+  card.querySelector('.indicator-value').style.color = color;
+  card.querySelector('.indicator-signal').textContent = sub;
+  card.querySelector('.indicator-signal').style.color = color;
+  card.querySelector('.indicator-bar-fill').style.width = barPct + '%';
+  card.querySelector('.indicator-bar-fill').style.background = barColor;
+}
+
+function renderVIX() {
+  const v = indicators.vix;
+  if (v === null) { setIndicatorCard('indVix', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color, sub;
+  if (v >= 40)      { signal = 'buy';     color = 'var(--green)'; sub = 'Extreme fear — strong buy zone'; }
+  else if (v >= 30) { signal = 'buy';     color = 'var(--green)'; sub = 'High fear — dip buy zone'; }
+  else if (v >= 25) { signal = 'caution'; color = 'var(--amber)'; sub = 'Elevated — watch closely'; }
+  else if (v >= 20) { signal = 'caution'; color = 'var(--amber)'; sub = 'Cautious — mild stress'; }
+  else              { signal = '';         color = 'var(--blue)';  sub = 'Calm market'; }
+  setIndicatorCard('indVix', { value: v.toFixed(1), sub, signal, color, barPct: Math.min(100, (v / 50) * 100), barColor: color });
+}
+
+function renderRSI() {
+  const rsi = indicators.rsi[activeTicker];
+  document.getElementById('indRsiTicker').textContent = activeTicker;
+  if (rsi == null) { setIndicatorCard('indRsi', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color, sub;
+  if (rsi < 30)      { signal = 'buy';     color = 'var(--green)'; sub = 'Oversold — buy signal'; }
+  else if (rsi < 40) { signal = 'buy';     color = 'var(--green)'; sub = 'Near oversold'; }
+  else if (rsi < 55) { signal = '';         color = 'var(--text)';  sub = 'Neutral'; }
+  else if (rsi < 70) { signal = 'caution'; color = 'var(--amber)'; sub = 'Approaching overbought'; }
+  else               { signal = 'danger';  color = 'var(--red)';   sub = 'Overbought — wait'; }
+  setIndicatorCard('indRsi', { value: rsi.toFixed(1), sub, signal, color, barPct: rsi, barColor: color });
+}
+
+function renderFNG() {
+  const f = indicators.fng;
+  if (!f) { setIndicatorCard('indFng', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color;
+  if (f.value <= 25)      { signal = 'buy';     color = 'var(--green)'; }
+  else if (f.value <= 45) { signal = 'buy';     color = 'var(--green)'; }
+  else if (f.value <= 55) { signal = '';         color = 'var(--text)'; }
+  else if (f.value <= 75) { signal = 'caution'; color = 'var(--amber)'; }
+  else                    { signal = 'danger';  color = 'var(--red)'; }
+  setIndicatorCard('indFng', { value: f.value, sub: f.label, signal, color, barPct: f.value, barColor: color });
+}
+
+function renderMA200() {
+  const ma = indicators.ma200[activeTicker];
+  const cur = TICKERS[activeTicker]?.current;
+  document.getElementById('indMaTicker').textContent = activeTicker;
+  if (!ma || !cur) { setIndicatorCard('indMa', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  const pct = ((cur - ma) / ma) * 100;
+  let signal, color, sub;
+  if (pct <= -10)     { signal = 'buy';     color = 'var(--green)'; sub = `${Math.abs(pct).toFixed(1)}% below 200 MA — deep discount`; }
+  else if (pct <= -5) { signal = 'buy';     color = 'var(--green)'; sub = `${Math.abs(pct).toFixed(1)}% below 200 MA — good zone`; }
+  else if (pct <= 0)  { signal = 'caution'; color = 'var(--amber)'; sub = `${Math.abs(pct).toFixed(1)}% below 200 MA`; }
+  else                { signal = '';         color = 'var(--blue)';  sub = `${pct.toFixed(1)}% above 200 MA`; }
+  const barPct = Math.max(0, Math.min(100, 50 + pct * 2));
+  setIndicatorCard('indMa', { value: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', sub, signal, color, barPct, barColor: color });
+}
+
+// ── Sell Signals ─────────────────────────────────────────────────────────────
+
+function renderSellSignals() {
+  renderSellRSI();
+  renderSellFNG();
+  renderSellVIX();
+  renderSellMA();
+  renderSellCallout();
+  renderProfitTargets();
+}
+
+function renderSellRSI() {
+  const rsi = indicators.rsi[activeTicker];
+  document.getElementById('sellIndRsiTicker').textContent = activeTicker;
+  if (rsi == null) { setIndicatorCard('sellIndRsi', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color, sub;
+  if (rsi >= 80)       { signal = 'danger';  color = 'var(--red)';   sub = 'Extremely overbought — sell'; }
+  else if (rsi >= 70)  { signal = 'danger';  color = 'var(--red)';   sub = 'Overbought — trim position'; }
+  else if (rsi >= 60)  { signal = 'caution'; color = 'var(--amber)'; sub = 'Elevated — consider partial trim'; }
+  else                 { signal = '';         color = 'var(--muted)'; sub = 'No sell signal'; }
+  setIndicatorCard('sellIndRsi', { value: rsi.toFixed(1), sub, signal, color, barPct: rsi, barColor: color });
+}
+
+function renderSellFNG() {
+  const f = indicators.fng;
+  if (!f) { setIndicatorCard('sellIndFng', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color, sub;
+  if (f.value >= 80)      { signal = 'danger';  color = 'var(--red)';   sub = 'Extreme Greed — sell signal'; }
+  else if (f.value >= 65) { signal = 'danger';  color = 'var(--red)';   sub = 'Greed — trim exposure'; }
+  else if (f.value >= 55) { signal = 'caution'; color = 'var(--amber)'; sub = 'Mild greed — watch'; }
+  else                    { signal = '';         color = 'var(--muted)'; sub = 'No sell signal'; }
+  setIndicatorCard('sellIndFng', { value: f.value, sub, signal, color, barPct: f.value, barColor: color });
+}
+
+function renderSellVIX() {
+  const v = indicators.vix;
+  if (v === null) { setIndicatorCard('sellIndVix', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  let signal, color, sub;
+  if (v <= 12)       { signal = 'danger';  color = 'var(--red)';   sub = 'Extreme complacency — sell'; }
+  else if (v <= 15)  { signal = 'danger';  color = 'var(--red)';   sub = 'Low volatility — trim risk'; }
+  else if (v <= 18)  { signal = 'caution'; color = 'var(--amber)'; sub = 'Calm market — watch'; }
+  else               { signal = '';         color = 'var(--muted)'; sub = 'No sell signal'; }
+  // bar inverted: low VIX = high sell signal
+  const barPct = Math.max(0, Math.min(100, (1 - v / 40) * 100));
+  setIndicatorCard('sellIndVix', { value: v.toFixed(1), sub, signal, color, barPct, barColor: color });
+}
+
+function renderSellMA() {
+  const ma = indicators.ma200[activeTicker];
+  const cur = TICKERS[activeTicker]?.current;
+  document.getElementById('sellIndMaTicker').textContent = activeTicker;
+  if (!ma || !cur) { setIndicatorCard('sellIndMa', { value: 'N/A', sub: 'unavailable', signal: '', color: 'var(--muted)', barPct: 0, barColor: 'var(--muted)' }); return; }
+  const pct = ((cur - ma) / ma) * 100;
+  let signal, color, sub;
+  if (pct >= 20)      { signal = 'danger';  color = 'var(--red)';   sub = `${pct.toFixed(1)}% above 200 MA — overextended`; }
+  else if (pct >= 10) { signal = 'danger';  color = 'var(--red)';   sub = `${pct.toFixed(1)}% above 200 MA — trim signal`; }
+  else if (pct >= 5)  { signal = 'caution'; color = 'var(--amber)'; sub = `${pct.toFixed(1)}% above 200 MA — watch`; }
+  else                { signal = '';         color = 'var(--muted)'; sub = pct >= 0 ? `${pct.toFixed(1)}% above 200 MA — ok` : 'Below 200 MA — no sell signal'; }
+  const barPct = Math.max(0, Math.min(100, pct * 4));
+  setIndicatorCard('sellIndMa', { value: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%', sub, signal, color, barPct, barColor: color });
+}
+
+function renderSellCallout() {
+  const el = document.getElementById('sellCallout');
+  const rsi = indicators.rsi[activeTicker];
+  const f = indicators.fng;
+  const v = indicators.vix;
+  const ma = indicators.ma200[activeTicker];
+  const cur = TICKERS[activeTicker]?.current;
+
+  const triggers = [];
+  if (rsi != null && rsi >= 70) triggers.push(`RSI <strong>${rsi.toFixed(0)}</strong>`);
+  if (f && f.value >= 65) triggers.push(`Fear &amp; Greed <strong>${f.value}</strong> (${f.label})`);
+  if (v !== null && v <= 15) triggers.push(`VIX <strong>${v.toFixed(1)}</strong> (complacency)`);
+  if (ma && cur) {
+    const pct = ((cur - ma) / ma) * 100;
+    if (pct >= 10) triggers.push(`<strong>${pct.toFixed(1)}%</strong> above 200 MA`);
+  }
+
+  if (!triggers.length) {
+    el.style.display = 'flex';
+    el.style.borderColor = 'rgba(107,107,126,0.2)';
+    el.style.background = 'var(--surface2)';
+    el.innerHTML = `<div style="width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0"></div><div class="sell-callout-text" style="color:var(--muted)">No active sell signals — conditions not overheated</div>`;
+  } else {
+    el.style.display = 'flex';
+    el.style.borderColor = '';
+    el.style.background = '';
+    el.innerHTML = `<div class="sell-dot"></div><div class="sell-callout-text">Sell signal${triggers.length > 1 ? 's' : ''}: ${triggers.join(' · ')}</div>`;
+  }
+}
+
+function renderProfitTargets() {
+  const d = TICKERS[activeTicker];
+  const ath = d.ath;
+  const cur = d.current;
+  const grid = document.getElementById('profitGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  [5, 8, 10, 15, 20].forEach(dipPct => {
+    const entry = ath * (1 - dipPct / 100);
+    const t5   = entry * 1.05;
+    const t10  = entry * 1.10;
+    const gainToAth = ((ath - entry) / entry) * 100;
+    const currentGain = ((cur - entry) / entry) * 100;
+
+    const entryClass = cur >= entry ? 'gain-green' : 'gain-red';
+    const t5Class    = cur >= t5   ? 'gain-green' : cur >= entry ? 'gain-amber' : 'gain-red';
+    const t10Class   = cur >= t10  ? 'gain-green' : cur >= entry ? 'gain-amber' : 'gain-red';
+    const athClass   = cur >= ath  ? 'gain-green' : cur >= entry ? 'gain-amber' : 'gain-red';
+
+    grid.innerHTML += `
+      <div class="profit-row">
+        <div style="color:var(--text);font-weight:500">−${dipPct}%</div>
+        <div>
+          <div style="color:var(--text)">${fmt(entry)}</div>
+          <div class="profit-gain ${entryClass}" style="margin-top:3px">${currentGain >= 0 ? '+' : ''}${currentGain.toFixed(1)}% now</div>
+        </div>
+        <div>
+          <div style="color:var(--text)">${fmt(t5)}</div>
+          <div class="profit-gain ${t5Class}" style="margin-top:3px">${cur >= t5 ? '✓ reached' : fmt(t5 - cur) + ' away'}</div>
+        </div>
+        <div>
+          <div style="color:var(--text)">${fmt(t10)}</div>
+          <div class="profit-gain ${t10Class}" style="margin-top:3px">${cur >= t10 ? '✓ reached' : fmt(t10 - cur) + ' away'}</div>
+        </div>
+        <div>
+          <div style="color:var(--text)">${fmt(ath)}</div>
+          <div class="profit-gain ${athClass}" style="margin-top:3px">+${gainToAth.toFixed(1)}% total</div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ── End Sell Signals ──────────────────────────────────────────────────────────
 
 async function fetchTickerLiveData(symbol) {
   const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_KEY}`;
@@ -689,6 +1183,8 @@ function switchTicker(t) {
   document.getElementById('inputPrice').value = d.current.toFixed(2);
   document.getElementById('inputATH').value = d.ath.toFixed(2);
   render();
+  renderIndicators();
+  renderSellSignals();
 }
 
 function updateData() {
@@ -700,6 +1196,7 @@ function updateData() {
   document.getElementById('liveBadge').className = 'stale-badge';
   document.getElementById('liveBadge').textContent = '✎ manual';
   render();
+  renderSellSignals();
   checkDipEmailAlert(activeTicker);
 }
 
@@ -760,32 +1257,17 @@ async function sendDipAlertEmail({ symbol, level, dip, price, ath, email }) {
     `Time: ${new Date().toLocaleString('en-US')}`
   ].join('\n');
 
-  if (EMAILJS_SERVICE_ID && EMAILJS_TEMPLATE_ID && EMAILJS_PUBLIC_KEY) {
-    const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_id: EMAILJS_SERVICE_ID,
-        template_id: EMAILJS_TEMPLATE_ID,
-        user_id: EMAILJS_PUBLIC_KEY,
-        template_params: {
-          to_email: email,
-          subject,
-          ticker: symbol,
-          dip_level: level,
-          dip_percent: dip.toFixed(1),
-          current_price: fmt(price),
-          ath_price: fmt(ath),
-          message: body
-        }
-      })
-    });
-    if (!resp.ok) throw new Error('emailjs http ' + resp.status);
-    return 'Email sent';
-  }
-
-  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  return 'Email draft opened';
+  await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    to_email: email,
+    subject,
+    ticker: symbol,
+    dip_level: level,
+    dip_percent: dip.toFixed(1),
+    current_price: fmt(price),
+    ath_price: fmt(ath),
+    message: body
+  });
+  return 'Email sent';
 }
 
 async function checkDipEmailAlert(symbol) {
@@ -948,7 +1430,9 @@ document.getElementById('alertEmail').addEventListener('change', saveAlertSettin
 document.getElementById('alertThreshold').addEventListener('change', saveAlertSettings);
 updateAlertStatus();
 render();
+renderSellSignals();
 fetchAllPrices();
+fetchAllIndicators();
 </script>
 </body>
 </html>
