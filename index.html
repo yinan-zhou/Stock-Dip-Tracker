@@ -530,6 +530,33 @@
     margin-top: 2px;
   }
 
+  .indicator-desc {
+    font-size: 9.5px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.5;
+    border-top: 0.5px solid var(--border);
+    padding-top: 6px;
+  }
+
+  .desc-buy  { color: var(--green); }
+  .desc-sell { color: var(--red); }
+
+  .setup-banner {
+    background: rgba(124,106,247,0.08);
+    border: 0.5px solid rgba(124,106,247,0.3);
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    margin-bottom: 1rem;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent2);
+    display: none;
+  }
+
+  .setup-banner a { color: var(--accent); }
+
   .indicator-bar-wrap {
     margin-top: 8px;
     height: 4px;
@@ -667,30 +694,37 @@
 
   <!-- Market Indicators -->
   <div class="section-label">Market conditions</div>
+  <div class="setup-banner" id="setupBanner">
+    ⚠ VIX · RSI · 200-day MA need a free <a href="https://twelvedata.com/register" target="_blank">Twelve Data</a> API key — sign up (30s) → paste key into <code>TWELVEDATA_KEY</code> in the script
+  </div>
   <div class="indicators-row" id="indicatorsRow">
     <div class="indicator-card" id="indVix">
       <div class="indicator-label">VIX — Fear Gauge</div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Market volatility index. <span class="desc-buy">▲ &gt;30 = buy</span> · <span class="desc-sell">▼ &lt;15 = sell</span></div>
     </div>
     <div class="indicator-card" id="indRsi">
       <div class="indicator-label">RSI 14 — <span id="indRsiTicker">QQQ</span></div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Momentum (0–100). <span class="desc-buy">▲ &lt;30 = oversold buy</span> · <span class="desc-sell">▼ &gt;70 = overbought sell</span></div>
     </div>
     <div class="indicator-card" id="indFng">
       <div class="indicator-label">Fear &amp; Greed Index</div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Crowd sentiment (0–100). <span class="desc-buy">▲ &lt;25 = extreme fear buy</span> · <span class="desc-sell">▼ &gt;75 = greed sell</span></div>
     </div>
     <div class="indicator-card" id="indMa">
       <div class="indicator-label">vs 200-day MA — <span id="indMaTicker">QQQ</span></div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Long-term trend line. <span class="desc-buy">▲ 10%+ below = discount buy</span> · <span class="desc-sell">▼ 10%+ above = extended sell</span></div>
     </div>
   </div>
 
@@ -755,24 +789,28 @@
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Overbought when &gt;70 — momentum is exhausted, price likely to pull back. <span class="desc-sell">▼ Sell / trim above 70</span></div>
     </div>
     <div class="indicator-card" id="sellIndFng">
       <div class="indicator-label">Fear &amp; Greed</div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">When crowd is greedy, markets are overheated. <span class="desc-sell">▼ Sell / trim above 75</span></div>
     </div>
     <div class="indicator-card" id="sellIndVix">
       <div class="indicator-label">VIX complacency</div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Very low VIX = no fear = market complacency. <span class="desc-sell">▼ Reduce exposure below 15</span></div>
     </div>
     <div class="indicator-card" id="sellIndMa">
       <div class="indicator-label">Extension above 200 MA — <span id="sellIndMaTicker">QQQ</span></div>
       <div class="indicator-value" style="color:var(--muted)">—</div>
       <div class="indicator-signal" style="color:var(--muted)">Loading...</div>
       <div class="indicator-bar-wrap"><div class="indicator-bar-fill" style="width:0%;background:var(--muted)"></div></div>
+      <div class="indicator-desc">Price far above long-term trend = stretched, reversion risk. <span class="desc-sell">▼ Trim when 10%+ above 200 MA</span></div>
     </div>
   </div>
 
@@ -859,37 +897,35 @@ const ALERT_STORAGE_KEY = 'stockDipEmailAlert';
 const ALERT_SENT_KEY = 'stockDipEmailAlertSent';
 
 // ── Market Indicators ────────────────────────────────────────────────────────
+// Free key from twelvedata.com (sign up in 30s, 800 req/day)
+const TWELVEDATA_KEY = '';
 
 async function fetchVIX() {
-  const url = `https://finnhub.io/api/v1/quote?symbol=VIX&token=${FINNHUB_KEY}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!TWELVEDATA_KEY) throw new Error('no key');
+  const resp = await fetch(`https://api.twelvedata.com/price?symbol=VIX&apikey=${TWELVEDATA_KEY}`, { signal: AbortSignal.timeout(8000) });
   if (!resp.ok) throw new Error('vix http ' + resp.status);
   const data = await resp.json();
-  const v = data.c > 0 ? data.c : data.pc;
+  const v = parseFloat(data.price);
   if (!v || v <= 0) throw new Error('vix bad data');
   return v;
 }
 
 async function fetchRSI(symbol) {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 60 * 24 * 60 * 60; // 60 days back
-  const url = `https://finnhub.io/api/v1/indicator?symbol=${symbol}&resolution=D&from=${from}&to=${to}&indicator=rsi&timeperiod=14&token=${FINNHUB_KEY}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!TWELVEDATA_KEY) throw new Error('no key');
+  const resp = await fetch(`https://api.twelvedata.com/rsi?symbol=${symbol}&interval=1day&time_period=14&apikey=${TWELVEDATA_KEY}`, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error('rsi http ' + resp.status);
   const data = await resp.json();
-  if (!data.rsi?.length) throw new Error('rsi bad data');
-  return data.rsi[data.rsi.length - 1];
+  if (data.status === 'error' || !data.values?.length) throw new Error('rsi bad data');
+  return parseFloat(data.values[0].rsi);
 }
 
 async function fetchMA200(symbol) {
-  const to = Math.floor(Date.now() / 1000);
-  const from = to - 300 * 24 * 60 * 60; // 300 days back
-  const url = `https://finnhub.io/api/v1/indicator?symbol=${symbol}&resolution=D&from=${from}&to=${to}&indicator=sma&timeperiod=200&token=${FINNHUB_KEY}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!TWELVEDATA_KEY) throw new Error('no key');
+  const resp = await fetch(`https://api.twelvedata.com/sma?symbol=${symbol}&interval=1day&time_period=200&apikey=${TWELVEDATA_KEY}`, { signal: AbortSignal.timeout(12000) });
   if (!resp.ok) throw new Error('ma200 http ' + resp.status);
   const data = await resp.json();
-  if (!data.sma?.length) throw new Error('ma200 bad data');
-  return data.sma[data.sma.length - 1];
+  if (data.status === 'error' || !data.values?.length) throw new Error('ma200 bad data');
+  return parseFloat(data.values[0].sma);
 }
 
 async function fetchFearGreed() {
@@ -1429,6 +1465,7 @@ document.getElementById('alertThreshold').value = String(alertSettings.threshold
 document.getElementById('alertEmail').addEventListener('change', saveAlertSettings);
 document.getElementById('alertThreshold').addEventListener('change', saveAlertSettings);
 updateAlertStatus();
+if (!TWELVEDATA_KEY) document.getElementById('setupBanner').style.display = 'block';
 render();
 renderSellSignals();
 fetchAllPrices();
